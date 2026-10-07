@@ -1,0 +1,12 @@
+import base64, json
+t = open('template.html').read()
+img = base64.b64encode(open('data/img_0.jpg','rb').read()).decode()
+occ = json.load(open('data/occupancy.json'))
+slots = json.load(open('data/bounding_boxes.json'))
+t = (t.replace('__IMG__', 'data:image/jpeg;base64,' + img)
+      .replace('__ROUTING__', open('routing.js').read())
+      .replace('__SLOTS__', json.dumps(slots, separators=(',',':')))
+      .replace('__OCC__', json.dumps(occ['frames'], separators=(',',':')))
+      .replace('__FPS__', str(occ['fps'])))
+open('../index.html','w').write(t)
+print(len(t)//1024, 'KB')

@@ -1,0 +1,293 @@
+<title>Intelligent Parking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: wide camera stage on the left, a guidance panel on the right; stacks on phones. */
+:root {
+  --bg: #e9ecef;
+  --surface: #ffffff;
+  --ink: #181c20;
+  --ink-2: #566069;
+  --line: #d3d9de;
+  --route: #f5b700;
+  --route-casing: #14181c;
+  --free: #1a9a57;
+  --busy: #d8453c;
+  --sign: #0e5a3a;
+  --sign-ink: #ffffff;
+  --focus: #1d6fe0;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101315; --surface: #181c1f; --ink: #e8ecef; --ink-2: #99a3ab; --line: #2b3238;
+    --route: #ffc61a; --route-casing: #0a0c0e; --free: #3cc47f; --busy: #ff6a60;
+    --sign: #11704a; --sign-ink: #ffffff; --focus: #6aa8ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101315; --surface: #181c1f; --ink: #e8ecef; --ink-2: #99a3ab; --line: #2b3238;
+  --route: #ffc61a; --route-casing: #0a0c0e; --free: #3cc47f; --busy: #ff6a60;
+  --sign: #11704a; --sign-ink: #ffffff; --focus: #6aa8ff; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1180px; margin-inline: auto; padding-inline: 16px; padding-block: 24px 40px; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 2.1rem; letter-spacing: 0.01em; text-transform: uppercase; line-height: 1; margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 0; max-width: 60ch; text-wrap: pretty; }
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.stage-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 10px; min-width: 0; }
+.stage { position: relative; aspect-ratio: 1080 / 600; width: 100%; border-radius: 6px; overflow: hidden; background: #333; touch-action: manipulation; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; max-width: none; }
+.stage svg { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+.slot { fill-opacity: 0.38; stroke-width: 2; cursor: pointer; transition: fill-opacity 0.15s; }
+.slot.free { fill: var(--free); stroke: var(--free); }
+.slot.busy { fill: var(--busy); stroke: var(--busy); }
+.slot.target { fill-opacity: 0.8; stroke: #fff; stroke-width: 3; }
+.slot:hover { fill-opacity: 0.6; }
+.route-casing { fill: none; stroke: var(--route-casing); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
+.route-line { fill: none; stroke: var(--route); stroke-width: 5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 12 9; animation: flow 0.9s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -21; } }
+.car-dot { fill: var(--route); stroke: var(--route-casing); stroke-width: 4; }
+.car-label, .tag { font-family: var(--font-display); font-weight: 700; font-size: 17px; fill: #fff; paint-order: stroke; stroke: var(--route-casing); stroke-width: 4px; stroke-linejoin: round; text-transform: uppercase; letter-spacing: 0.04em; }
+.ring { fill: none; stroke: #fff; stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: pulse 1.6s ease-out infinite; }
+@keyframes pulse { from { transform: scale(0.8); opacity: 1; } to { transform: scale(1.9); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .route-line, .ring { animation: none; } }
+.controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+button { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; cursor: pointer; min-height: 36px; }
+button:hover { border-color: var(--ink-2); }
+button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; min-width: 84px; }
+button:focus-visible, input:focus-visible, .chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+input[type=range] { flex: 1 1 160px; min-width: 0; accent-color: var(--ink); height: 28px; }
+.time { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 8.5ch; text-align: right; }
+.hint { color: var(--ink-2); font-size: 0.85rem; margin: 0; padding-inline: 2px; text-wrap: pretty; }
+aside { display: grid; gap: 14px; min-width: 0; }
+.sign { background: var(--sign); color: var(--sign-ink); border-radius: 10px; padding: 14px 18px 16px; border: 3px solid rgba(255,255,255,0.85); outline: 2px solid var(--sign); outline-offset: -1px; box-shadow: 0 0 0 1px var(--line); }
+.sign small { display: block; font-family: var(--font-display); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.95rem; opacity: 0.9; }
+.sign .slot-id { font-family: var(--font-display); font-weight: 700; font-size: 5.2rem; line-height: 0.95; letter-spacing: 0.01em; }
+.sign .where { font-size: 0.9rem; opacity: 0.92; margin-top: 4px; }
+.sign.none { background: #5b3a1e; outline-color: #5b3a1e; }
+.sign.none .slot-id { font-size: 2.6rem; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.fact b { display: block; font-family: var(--font-mono); font-weight: 500; font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.fact span { color: var(--ink-2); font-size: 0.8rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 10px; }
+.panel h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.panel h2 span { font-family: var(--font-mono); font-weight: 400; font-size: 0.8rem; text-transform: none; letter-spacing: 0; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.row-label { font-size: 0.78rem; color: var(--ink-2); margin: 0 0 4px; }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; }
+.chip { font-family: var(--font-mono); font-size: 0.78rem; padding: 4px 0; min-height: 30px; border-radius: 4px; border: 1px solid transparent; text-align: center; font-variant-numeric: tabular-nums; color: #fff; }
+.chip.free { background: var(--free); }
+.chip.busy { background: var(--busy); }
+.chip.target { outline: 3px solid var(--ink); outline-offset: 1px; }
+.chip.edited::after { content: "•"; margin-left: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--ink-2); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.how { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; }
+.how h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 4px; }
+.how p { margin: 0; color: var(--ink-2); text-wrap: pretty; }
+.note { color: var(--ink-2); font-size: 0.82rem; margin: 0; max-width: 90ch; text-wrap: pretty; }
+code { font-family: var(--font-mono); font-size: 0.88em; }
+@media (max-width: 900px) { .app { grid-template-columns: minmax(0, 1fr); } .how { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { h1 { font-size: 1.75rem; } .sign .slot-id { font-size: 4.4rem; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Intelligent Parking</h1>
+    <p class="sub">Shows a driver the shortest path from where they are to the nearest empty slot, using the occupancy your CCTV detector already produces.</p>
+  </header>
+
+  <div class="app">
+    <div class="stage-card">
+      <div class="stage" id="stage">
+        <img id="frame" alt="Overhead camera view of the car park with 18 marked parking slots" src="__IMG__">
+        <svg id="overlay" viewBox="0 0 1080 600" role="img" aria-label="Parking slots coloured by availability with the route to the nearest free slot"></svg>
+      </div>
+      <div class="controls">
+        <button id="play" class="primary" type="button">Play</button>
+        <input id="scrub" type="range" min="0" max="0" value="0" step="1" aria-label="Position in the CCTV recording">
+        <span class="time" id="time">0.0 s</span>
+      </div>
+      <p class="hint">Click the asphalt to move the car. Click a slot to flip it between free and occupied and watch the route change.</p>
+    </div>
+
+    <aside>
+      <div class="sign" id="sign" aria-live="polite">
+        <small id="signLabel">Nearest free slot</small>
+        <div class="slot-id" id="slotId">–</div>
+        <div class="where" id="where"></div>
+      </div>
+      <div class="facts">
+        <div class="fact"><b id="dist">–</b><span>Distance, approx.</span></div>
+        <div class="fact"><b id="eta">–</b><span>At walking-pace driving</span></div>
+      </div>
+      <div class="panel">
+        <h2>Slots <span id="counts"></span></h2>
+        <div>
+          <p class="row-label">Row A, along the bottom</p>
+          <div class="chips" id="chipsA"></div>
+        </div>
+        <div>
+          <p class="row-label">Row B, diagonal bays on the right</p>
+          <div class="chips" id="chipsB"></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--free)"></i>Free</span>
+          <span><i style="background:var(--busy)"></i>Occupied</span>
+          <span><i style="background:var(--route)"></i>Route</span>
+        </div>
+        <button id="reset" type="button" hidden>Clear my changes</button>
+      </div>
+    </aside>
+  </div>
+
+  <section class="how" aria-label="How it works">
+    <div><h3>Detect</h3><p>YOLO11 finds the cars in each frame of the CCTV video.</p></div>
+    <div><h3>Match</h3><p>A slot counts as occupied when a car's centre falls inside its outline.</p></div>
+    <div><h3>Route</h3><p>Dijkstra's algorithm searches the drivable aisle and picks the free slot with the shortest drive.</p></div>
+  </section>
+  <p class="note">Occupancy here is read frame by frame from the repo's <code>output.mp4</code> (189 frames, 18 slots). Distances use roughly 0.055 m per pixel and ignore camera perspective, so treat them as estimates. In a live system the same page would read each new frame's occupancy from the detector instead.</p>
+</div>
+
+<script>
+__ROUTING__
+const SLOTS = __SLOTS__;
+const OCC = __OCC__;
+const FPS = __FPS__;
+const M_PER_PX = 0.055, SPEED = 1.4; // metres per pixel, metres per second
+
+const map = Router.build(SLOTS);
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('overlay');
+const name = (i) => (i < 13 ? 'A' + (i + 1) : 'B' + (i - 12));
+const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; };
+
+// Slots
+const polys = SLOTS.map((s, i) => {
+  const p = mk('polygon', { points: s.points.map((q) => q.join(',')).join(' '), class: 'slot free' });
+  p.dataset.i = i;
+  return p;
+});
+// Route layers sit above the slots
+const casing = mk('polyline', { class: 'route-casing', points: '' });
+const line = mk('polyline', { class: 'route-line', points: '' });
+const ringG = mk('g', {});
+const ring = mk('circle', { class: 'ring', r: 16, cx: -50, cy: -50 }, ringG);
+const tag = mk('text', { class: 'tag', x: -50, y: -50, 'text-anchor': 'middle' });
+const carG = mk('g', {});
+const car = mk('circle', { class: 'car-dot', r: 8, cx: 0, cy: 0 }, carG);
+const carText = mk('text', { class: 'car-label', x: 0, y: -16, 'text-anchor': 'middle' }, carG);
+carText.textContent = 'You';
+
+// Chips
+const chips = SLOTS.map((_, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'chip free'; b.textContent = name(i); b.dataset.i = i;
+  b.setAttribute('aria-label', 'Slot ' + name(i));
+  document.getElementById(i < 13 ? 'chipsA' : 'chipsB').appendChild(b);
+  return b;
+});
+
+// State
+let frame = 0, playing = false, target = null, last = 0;
+let carPos = [850, 540];
+const edits = {};
+let fld = Router.field(map, carPos[0], carPos[1]);
+const n = OCC.length;
+const scrub = document.getElementById('scrub');
+scrub.max = n - 1;
+// Open on a moderately busy frame so the route has something to avoid.
+(() => {
+  const totals = OCC.map((r) => r.reduce((a, b) => a + b, 0));
+  const sorted = [...totals].sort((a, b) => a - b);
+  const med = sorted[Math.floor(n * 0.75)];
+  frame = Math.max(0, totals.findIndex((t) => t >= med));
+})();
+
+const isBusy = (i) => (i in edits ? edits[i] : OCC[frame][i] === 1);
+
+function render() {
+  const free = [];
+  let busyCount = 0;
+  SLOTS.forEach((_, i) => {
+    const b = isBusy(i);
+    if (b) busyCount++; else free.push(i);
+    polys[i].setAttribute('class', 'slot ' + (b ? 'busy' : 'free'));
+    chips[i].className = 'chip ' + (b ? 'busy' : 'free') + (i in edits ? ' edited' : '');
+    chips[i].title = name(i) + (b ? ' occupied' : ' free');
+  });
+  document.getElementById('counts').textContent = free.length + ' free · ' + busyCount + ' occupied';
+
+  const pick = Router.nearest(map, fld, free, target);
+  target = pick ? pick.slot : null;
+
+  const sign = document.getElementById('sign');
+  carG.setAttribute('transform', 'translate(' + carPos[0] + ' ' + carPos[1] + ')');
+  if (pick) {
+    const pts = Router.route(map, fld, pick.slot, carPos);
+    const str = pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+    casing.setAttribute('points', str); line.setAttribute('points', str);
+    const c = map.meta[pick.slot].center;
+    ring.setAttribute('cx', c[0]); ring.setAttribute('cy', c[1]);
+    tag.setAttribute('x', c[0]); tag.setAttribute('y', c[1] - 26); tag.textContent = name(pick.slot);
+    const metres = Router.length(pts) * M_PER_PX;
+    sign.classList.remove('none');
+    document.getElementById('signLabel').textContent = 'Nearest free slot';
+    document.getElementById('slotId').textContent = name(pick.slot);
+    document.getElementById('where').textContent = pick.slot < 13 ? 'Row A, along the bottom' : 'Row B, diagonal bays';
+    document.getElementById('dist').textContent = Math.round(metres) + ' m';
+    document.getElementById('eta').textContent = Math.max(1, Math.round(metres / SPEED)) + ' s';
+  } else {
+    casing.setAttribute('points', ''); line.setAttribute('points', '');
+    ring.setAttribute('cx', -50); tag.textContent = '';
+    sign.classList.add('none');
+    document.getElementById('signLabel').textContent = 'No free slot';
+    document.getElementById('slotId').textContent = 'Lot full';
+    document.getElementById('where').textContent = 'Free a slot to see a route.';
+    document.getElementById('dist').textContent = '–'; document.getElementById('eta').textContent = '–';
+  }
+  polys.forEach((p, i) => { if (i === target) p.classList.add('target'); });
+  chips.forEach((c, i) => c.classList.toggle('target', i === target));
+  scrub.value = frame;
+  document.getElementById('time').textContent = (frame / FPS).toFixed(1) + ' / ' + ((n - 1) / FPS).toFixed(1) + ' s';
+  document.getElementById('reset').hidden = Object.keys(edits).length === 0;
+}
+
+// Interaction
+function toggle(i) { edits[i] = !isBusy(i); render(); }
+svg.addEventListener('click', (e) => {
+  const p = e.target.closest && e.target.closest('polygon.slot');
+  if (p) { toggle(+p.dataset.i); return; }
+  const r = svg.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * 1080, y = ((e.clientY - r.top) / r.height) * 600;
+  const c = Router.nearestWalk(map, x, y);
+  if (c < 0) return;
+  carPos = Router.centerOf(c);
+  fld = Router.field(map, carPos[0], carPos[1]);
+  render();
+});
+chips.forEach((b) => b.addEventListener('click', () => toggle(+b.dataset.i)));
+document.getElementById('reset').addEventListener('click', () => { for (const k in edits) delete edits[k]; render(); });
+scrub.addEventListener('input', () => { frame = +scrub.value; render(); });
+
+const playBtn = document.getElementById('play');
+function tick(t) {
+  if (!playing) return;
+  if (!last) last = t;
+  const adv = ((t - last) / 1000) * FPS;
+  if (adv >= 1) { frame = (frame + Math.floor(adv)) % n; last = t; render(); }
+  requestAnimationFrame(tick);
+}
+playBtn.addEventListener('click', () => {
+  playing = !playing; last = 0;
+  playBtn.textContent = playing ? 'Pause' : 'Play';
+  if (playing) requestAnimationFrame(tick);
+});
+
+render();
+</script>
