@@ -21,7 +21,7 @@ import json
 import cv2
 import numpy as np
 
-from ultralytics.solutions.solutions import LOGGER, BaseSolution, check_requirements
+from ultralytics.solutions.solutions import LOGGER, BaseSolution
 from ultralytics.utils.plotting import Annotator
 
 
@@ -44,9 +44,14 @@ class ParkingPtsSelection:
 
     def __init__(self):
         """Bootstrap: verify tkinter is available, build the UI, start the event loop."""
-        check_requirements("tkinter")
-        import tkinter as tk
-        from tkinter import filedialog, messagebox
+        try:
+            import tkinter as tk
+            from tkinter import filedialog, messagebox
+        except ImportError:
+            raise ImportError(
+                "Tkinter is not available in your Python installation. "
+                "On Windows, re-run the Python installer and check 'tcl/tk and IDLE'."
+            )
 
         # Store references to tkinter submodules for use in other methods
         self.tk, self.filedialog, self.messagebox = tk, filedialog, messagebox
