@@ -20,6 +20,7 @@ import json
 
 import cv2
 import numpy as np
+import os
 
 from ultralytics.solutions.solutions import LOGGER, BaseSolution
 from ultralytics.utils.plotting import Annotator
@@ -193,7 +194,15 @@ class ParkingPtsSelection:
         with open("bounding_boxes.json", "w") as f:
             json.dump(data, f, indent=4)
 
-        self.messagebox.showinfo("Success", "Bounding boxes saved to bounding_boxes.json")
+        os.makedirs("docs/source/data", exist_ok=True)
+        with open("docs/source/data/bounding_boxes.json", "w") as f:
+            json.dump(data, f, indent=4)
+
+        self.messagebox.showinfo(
+            "Success",
+            "Bounding boxes saved to bounding_boxes.json\n"
+            "and docs/source/data/bounding_boxes.json",
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
